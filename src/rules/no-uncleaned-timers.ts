@@ -217,8 +217,46 @@ export const noUncleanedTimersRule = createRule({
               node: returnArg,
               messageId: 'invalidCleanupValue',
             });
+            return;
           }
-          return;
+
+          if (effectCallback.type === 'ArrowFunctionExpression' || effectCallback.type === 'FunctionExpression') {
+            const body = effectCallback.body;
+            if (body.type === 'BlockStatement') {
+              const cleanupDefinition = body.body.find((stmt) => {
+                if (stmt.type === 'FunctionDeclaration' && stmt.id?.name === returnArg.name) {
+                  return true;
+                }
+
+                return (
+                  stmt.type === 'VariableDeclaration' &&
+                  stmt.declarations.some(
+                    (declaration) =>
+                      declaration.id.type === 'Identifier' &&
+                      declaration.id.name === returnArg.name &&
+                      (declaration.init?.type === 'ArrowFunctionExpression' ||
+                        declaration.init?.type === 'FunctionExpression')
+                  )
+                );
+              });
+
+              if (cleanupDefinition?.type === 'FunctionDeclaration') {
+                checkCleanupCall(cleanupDefinition);
+              } else if (cleanupDefinition?.type === 'VariableDeclaration') {
+                const declaration = cleanupDefinition.declarations.find(
+                  (item) =>
+                    item.id.type === 'Identifier' &&
+                    item.id.name === returnArg.name &&
+                    (item.init?.type === 'ArrowFunctionExpression' ||
+                      item.init?.type === 'FunctionExpression')
+                );
+
+                if (declaration?.init) {
+                  checkCleanupCall(declaration.init);
+                }
+              }
+            }
+          }
         } else {
           checkCleanupCall(returnArg);
         }

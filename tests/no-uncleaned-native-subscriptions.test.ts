@@ -33,20 +33,19 @@ ruleTester.run('no-uncleaned-native-subscriptions', noUncleanedNativeSubscriptio
     {
       code: `
         useEffect(() => {
-          let sub = Location.watchPositionAsync({}, callback);
-          return () => {
-            sub.remove();
-          };
-        }, []);
-      `,
-    },
-    {
-      code: `
-        useEffect(() => {
           const cleanup = otherFunction();
           return cleanup;
         }, []);
       `, // Rule should ignore other functions
+    },
+    {
+      code: `
+        useEffect(() => {
+          const sub = AppState.addEventListener('change', handleChange);
+          const cleanup = () => sub.remove();
+          return cleanup;
+        }, []);
+      `,
     },
   ],
   invalid: [
@@ -89,6 +88,18 @@ ruleTester.run('no-uncleaned-native-subscriptions', noUncleanedNativeSubscriptio
         }, []);
       `,
       errors: [{ messageId: 'invalidCleanupValue' }],
+    },
+    {
+      code: `
+        useEffect(() => {
+          const sub = AppState.addEventListener('change', handleChange);
+          function cleanup() {
+            console.log('still subscribed');
+          }
+          return cleanup;
+        }, []);
+      `,
+      errors: [{ messageId: 'notCleanedUp' }],
     },
   ],
 });

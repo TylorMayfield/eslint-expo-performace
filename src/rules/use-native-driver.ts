@@ -62,9 +62,6 @@ export const useNativeDriverRule = createRule({
               context.report({
                 node: useNativeDriverProp.value,
                 messageId: 'nativeDriverFalse',
-                fix(fixer) {
-                  return fixer.replaceText(useNativeDriverProp.value, 'true');
-                },
               });
             }
           }

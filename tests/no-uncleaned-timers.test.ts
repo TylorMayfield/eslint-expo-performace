@@ -44,6 +44,17 @@ ruleTester.run('no-uncleaned-timers', noUncleanedTimersRule, {
         }, []);
       `,
     },
+    {
+      code: `
+        useEffect(() => {
+          const id = setInterval(sync, 1000);
+          function cleanup() {
+            clearInterval(id);
+          }
+          return cleanup;
+        }, []);
+      `,
+    },
   ],
   invalid: [
     {
@@ -85,6 +96,18 @@ ruleTester.run('no-uncleaned-timers', noUncleanedTimersRule, {
         }, []);
       `,
       errors: [{ messageId: 'invalidCleanupValue' }],
+    },
+    {
+      code: `
+        useEffect(() => {
+          const id = setInterval(sync, 1000);
+          const cleanup = () => {
+            console.log('missing timer cleanup');
+          };
+          return cleanup;
+        }, []);
+      `,
+      errors: [{ messageId: 'notCleanedUp' }],
     },
   ],
 });

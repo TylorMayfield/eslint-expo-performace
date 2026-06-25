@@ -25,7 +25,6 @@ export const noUncleanedNativeSubscriptionsRule = createRule({
       ['Gyroscope', new Set(['addListener'])],
       ['Magnetometer', new Set(['addListener'])],
       ['Pedometer', new Set(['watchStepCount'])],
-      ['Location', new Set(['watchPositionAsync', 'watchHeadingAsync'])],
       ['DeviceEventEmitter', new Set(['addListener'])],
       ['AppState', new Set(['addEventListener'])],
     ]);
@@ -87,6 +86,10 @@ export const noUncleanedNativeSubscriptionsRule = createRule({
         // 2. Check if the subscription is assigned to a variable or property
         let varNode: TSESTree.Identifier | TSESTree.MemberExpression | null = null;
         let p = node.parent;
+        if (p && p.type === 'AwaitExpression') {
+          p = p.parent;
+        }
+
         if (p && p.type === 'VariableDeclarator' && p.id.type === 'Identifier') {
           varNode = p.id;
         } else if (p && p.type === 'AssignmentExpression' && p.operator === '=') {
@@ -206,8 +209,46 @@ export const noUncleanedNativeSubscriptionsRule = createRule({
               node: returnArg,
               messageId: 'invalidCleanupValue',
             });
+            return;
           }
-          return;
+
+          if (effectCallback.type === 'ArrowFunctionExpression' || effectCallback.type === 'FunctionExpression') {
+            const body = effectCallback.body;
+            if (body.type === 'BlockStatement') {
+              const cleanupDefinition = body.body.find((stmt) => {
+                if (stmt.type === 'FunctionDeclaration' && stmt.id?.name === returnArg.name) {
+                  return true;
+                }
+
+                return (
+                  stmt.type === 'VariableDeclaration' &&
+                  stmt.declarations.some(
+                    (declaration) =>
+                      declaration.id.type === 'Identifier' &&
+                      declaration.id.name === returnArg.name &&
+                      (declaration.init?.type === 'ArrowFunctionExpression' ||
+                        declaration.init?.type === 'FunctionExpression')
+                  )
+                );
+              });
+
+              if (cleanupDefinition?.type === 'FunctionDeclaration') {
+                checkCleanupCall(cleanupDefinition);
+              } else if (cleanupDefinition?.type === 'VariableDeclaration') {
+                const declaration = cleanupDefinition.declarations.find(
+                  (item) =>
+                    item.id.type === 'Identifier' &&
+                    item.id.name === returnArg.name &&
+                    (item.init?.type === 'ArrowFunctionExpression' ||
+                      item.init?.type === 'FunctionExpression')
+                );
+
+                if (declaration?.init) {
+                  checkCleanupCall(declaration.init);
+                }
+              }
+            }
+          }
         } else {
           checkCleanupCall(returnArg);
         }

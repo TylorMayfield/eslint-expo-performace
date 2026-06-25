@@ -45,7 +45,10 @@ export const useExpoImageRule = createRule({
                   .join(', ');
                 
                 const newRNImport = `import { ${specifiersText} } from 'react-native';`;
-                const newExpoImport = `import { Image } from 'expo-image';`;
+                const imageImportName = imageSpecifier.local.name === 'Image'
+                  ? 'Image'
+                  : `Image as ${imageSpecifier.local.name}`;
+                const newExpoImport = `import { ${imageImportName} } from 'expo-image';`;
                 
                 return fixer.replaceText(node, `${newRNImport}\n${newExpoImport}`);
               },

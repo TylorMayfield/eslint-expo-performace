@@ -1,6 +1,8 @@
 # eslint-plugin-expo-performance
 
-An ESLint plugin for Expo and React Native projects designed to identify bad practices that lead to high battery usage, memory leaks, and CPU performance bottlenecks.
+An ESLint plugin for Expo and React Native projects designed to catch common AI-generated code smells that lead to high battery usage, memory leaks, render churn, and CPU performance bottlenecks.
+
+The rules intentionally focus on high-signal patterns that AI assistants often produce: missing cleanup, inline render work, unstable list/context values, overly expensive location settings, and Expo/React Native APIs used in subtly wrong ways.
 
 ## Installation
 
@@ -46,6 +48,13 @@ export default [
       'expo-performance/use-window-dimensions': 'error',
       'expo-performance/use-expo-image': 'warn',
       'expo-performance/use-native-driver': 'warn',
+      'expo-performance/prefer-flash-list-for-large-lists': 'warn',
+      'expo-performance/no-inline-list-render-props': 'warn',
+      'expo-performance/require-location-watch-cleanup': 'error',
+      'expo-performance/no-anonymous-context-values': 'warn',
+      'expo-performance/no-heavy-work-in-render': 'warn',
+      'expo-performance/prefer-interaction-manager-for-noncritical-work': 'warn',
+      'expo-performance/no-index-key-in-lists': 'error',
     },
   },
 ];
@@ -66,7 +75,7 @@ Enable the plugin in legacy eslintrc configurations:
 
 ## Supported Rules
 
-This plugin includes the following rules to target battery usage and performance:
+This plugin includes the following rules to flag commonly generated Expo and React Native mistakes:
 
 | Rule | Category | Severity | Description |
 | :--- | :--- | :--- | :--- |
@@ -78,6 +87,13 @@ This plugin includes the following rules to target battery usage and performance
 | [`use-window-dimensions`](#use-window-dimensions) | Layout | `error` | Enforces `useWindowDimensions` hook instead of static module-level `Dimensions.get` queries. |
 | [`use-expo-image`](#use-expo-image) | CPU / Memory | `warn` | Enforces using `expo-image` instead of `react-native` Image for optimized caching and memory. |
 | [`use-native-driver`](#use-native-driver) | CPU / FPS | `warn` | Enforces `useNativeDriver: true` for React Native Animated transitions. |
+| [`prefer-flash-list-for-large-lists`](#prefer-flash-list-for-large-lists) | Memory / Scroll | `warn` | Suggests FlashList for dynamic FlatList/SectionList datasets. |
+| [`no-inline-list-render-props`](#no-inline-list-render-props) | Render | `warn` | Prevents unstable inline render callbacks and object props on list components. |
+| [`require-location-watch-cleanup`](#require-location-watch-cleanup) | Battery / Location | `error` | Ensures async Expo Location watchers are captured and removed. |
+| [`no-anonymous-context-values`](#no-anonymous-context-values) | Render | `warn` | Prevents new context provider values from being allocated on every render. |
+| [`no-heavy-work-in-render`](#no-heavy-work-in-render) | CPU | `warn` | Flags obvious expensive work in component render bodies. |
+| [`prefer-interaction-manager-for-noncritical-work`](#prefer-interaction-manager-for-noncritical-work) | Navigation / FPS | `warn` | Defers expensive focus work until after navigation interactions. |
+| [`no-index-key-in-lists`](#no-index-key-in-lists) | Correctness / Render | `error` | Prevents array indexes from being used as list keys. |
 
 ---
 
@@ -203,13 +219,120 @@ Running animations on the JavaScript thread will lag if the JS thread is busy wi
   Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }).start();
   ```
 
+#### `prefer-flash-list-for-large-lists`
+Dynamic `FlatList` and `SectionList` data can become expensive as feeds grow. Prefer `FlashList` for large or unknown-size lists.
+
+* **Incorrect**:
+  ```javascript
+  <FlatList data={messages} renderItem={renderMessage} />
+  ```
+* **Correct**:
+  ```javascript
+  <FlashList data={messages} renderItem={renderMessage} estimatedItemSize={72} />
+  ```
+
+Use `performanceExempt` on a list when a dynamic data source is intentionally small.
+
+#### `no-inline-list-render-props`
+Inline list callbacks and style objects create new identities on every render, which can invalidate memoized rows.
+
+* **Incorrect**:
+  ```javascript
+  <FlatList renderItem={({ item }) => <Row item={item} />} contentContainerStyle={{ padding: 16 }} />
+  ```
+* **Correct**:
+  ```javascript
+  <FlatList renderItem={renderItem} contentContainerStyle={contentStyle} />
+  ```
+
+#### `require-location-watch-cleanup`
+Expo Location watcher subscriptions resolve asynchronously. Capture the resolved subscription and remove it in hook cleanup.
+
+* **Incorrect**:
+  ```javascript
+  useEffect(() => {
+    const sub = Location.watchPositionAsync(options, onLocation);
+    return () => sub.remove();
+  }, []);
+  ```
+* **Correct**:
+  ```javascript
+  useEffect(() => {
+    let sub;
+    Location.watchPositionAsync(options, onLocation).then(nextSub => {
+      sub = nextSub;
+    });
+    return () => sub?.remove();
+  }, []);
+  ```
+
+#### `no-anonymous-context-values`
+Passing anonymous values to context providers causes all consumers to see a new value on every render.
+
+* **Incorrect**:
+  ```javascript
+  <SessionContext.Provider value={{ user, logout }}>{children}</SessionContext.Provider>
+  ```
+* **Correct**:
+  ```javascript
+  const value = useMemo(() => ({ user, logout }), [user, logout]);
+  return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
+  ```
+
+#### `no-heavy-work-in-render`
+Obvious CPU-heavy work in render competes with gestures and animations on the JavaScript thread.
+
+* **Incorrect**:
+  ```javascript
+  const Profile = ({ raw }) => {
+    const parsed = JSON.parse(raw);
+    return <Text>{parsed.name}</Text>;
+  };
+  ```
+* **Correct**:
+  ```javascript
+  const Profile = ({ raw }) => {
+    const parsed = useMemo(() => JSON.parse(raw), [raw]);
+    return <Text>{parsed.name}</Text>;
+  };
+  ```
+
+#### `prefer-interaction-manager-for-noncritical-work`
+Expensive work started on navigation focus can block transition animations. Defer non-critical work until after interactions settle.
+
+* **Incorrect**:
+  ```javascript
+  useFocusEffect(() => {
+    hydrateDashboard();
+  });
+  ```
+* **Correct**:
+  ```javascript
+  useFocusEffect(() => {
+    const task = InteractionManager.runAfterInteractions(() => hydrateDashboard());
+    return () => task.cancel();
+  });
+  ```
+
+#### `no-index-key-in-lists`
+AI-generated list code often falls back to array indexes for keys. This works until items are inserted, removed, filtered, or sorted, then rows can keep the wrong state.
+
+* **Incorrect**:
+  ```javascript
+  <FlatList data={items} keyExtractor={(item, index) => index.toString()} />
+  ```
+* **Correct**:
+  ```javascript
+  <FlatList data={items} keyExtractor={(item) => item.id} />
+  ```
+
 ---
 
 ## Future Proposed Rules
 
-These rules represent additional opportunities to optimize React Native/Expo performance:
+Future rules should stay focused on common AI failure modes: code that looks plausible, passes TypeScript, but usually needs a human cleanup pass before it is production-ready.
 
-1. **`use-flash-list`**: Enforce utilizing Shopify's `@shopify/flash-list` instead of standard React Native `<FlatList>` for large, scrollable datasets. `FlashList` recycles views rather than re-creating them, resulting in smoother scrolling and lower memory churn.
-2. **`no-inline-jsx-objects-in-lists`**: Warn against passing new object or array literals in JSX properties inside lists or frequently rendered components (e.g. `style={{ margin: 10 }}` or `renderItem={({ item }) => <Row item={item} />`), as this forces re-rendering of all children because of new identity allocation.
-3. **`no-complex-svg-in-render`**: Enforce rendering complex SVG code through compiled components or memoization rather than embedding large raw SVG structures directly in the rendering path, avoiding recalculation of SVG paths.
-4. **`no-duplicate-location-watchers`**: Flag cases where multiple location watching operations are started concurrently without checking if an existing session is running.
+1. **`no-complex-svg-in-render`**: Flag large inline SVG trees inside component render paths instead of memoized or extracted components.
+2. **`no-duplicate-location-watchers`**: Flag multiple location watchers started without checking whether an existing session is already active.
+3. **`no-unbounded-image-cache`**: Flag dynamic remote images that omit dimensions, cache policy, or placeholder strategy.
+4. **`no-placeholder-error-handling`**: Flag empty `catch` blocks, `console.error`-only recovery, and TODO placeholder fallbacks in async code.

@@ -89,5 +89,14 @@ ruleTester.run('no-unmemoized-array-operations', noUnmemoizedArrayOperationsRule
       `,
       errors: [{ messageId: 'unmemoizedArrayOp' }],
     },
+    {
+      code: `
+        const MyComponent = () => {
+          useSearch(items.filter(item => item.visible));
+          return null;
+        };
+      `,
+      errors: [{ messageId: 'unmemoizedArrayOp' }],
+    },
   ],
 });

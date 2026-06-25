@@ -34,7 +34,7 @@ ruleTester.run('use-native-driver', useNativeDriverRule, {
     {
       code: "Animated.spring(val, { toValue: 1, useNativeDriver: false });",
       errors: [{ messageId: 'nativeDriverFalse' }],
-      output: "Animated.spring(val, { toValue: 1, useNativeDriver: true });",
+      output: null,
     },
     {
       code: "Animated.decay(val, {});",

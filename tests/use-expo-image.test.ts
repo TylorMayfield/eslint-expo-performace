@@ -42,6 +42,11 @@ ruleTester.run('use-expo-image', useExpoImageRule, {
       output: "import { View, Text } from 'react-native';\nimport { Image } from 'expo-image';",
     },
     {
+      code: "import { View, Image as RNImage } from 'react-native';",
+      errors: [{ messageId: 'useExpoImage' }],
+      output: "import { View } from 'react-native';\nimport { Image as RNImage } from 'expo-image';",
+    },
+    {
       code: "const element = <img src='logo.png' />;",
       errors: [{ messageId: 'useExpoImage' }],
     },

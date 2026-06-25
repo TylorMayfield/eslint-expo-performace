@@ -32,7 +32,7 @@ import expoPerformance from 'eslint-plugin-expo-performance';
 
 export default [
   // Extend the recommended configuration
-  expoPerformance.configs['flat/recommended'],
+  ...expoPerformance.configs['flat/recommended'],
   
   // Or manually configure individual rules
   {
@@ -40,21 +40,21 @@ export default [
       'expo-performance': expoPerformance,
     },
     rules: {
-      'expo-performance/no-uncleaned-native-subscriptions': 'error',
-      'expo-performance/no-uncleaned-timers': 'error',
+      'expo-performance/no-uncleaned-native-subscriptions': 'warn',
+      'expo-performance/no-uncleaned-timers': 'warn',
       'expo-performance/no-high-accuracy-location': 'warn',
       'expo-performance/no-unmemoized-array-operations': 'warn',
-      'expo-performance/no-inline-navigation-components': 'error',
-      'expo-performance/use-window-dimensions': 'error',
+      'expo-performance/no-inline-navigation-components': 'warn',
+      'expo-performance/use-window-dimensions': 'warn',
       'expo-performance/use-expo-image': 'warn',
       'expo-performance/use-native-driver': 'warn',
       'expo-performance/prefer-flash-list-for-large-lists': 'warn',
       'expo-performance/no-inline-list-render-props': 'warn',
-      'expo-performance/require-location-watch-cleanup': 'error',
+      'expo-performance/require-location-watch-cleanup': 'warn',
       'expo-performance/no-anonymous-context-values': 'warn',
       'expo-performance/no-heavy-work-in-render': 'warn',
       'expo-performance/prefer-interaction-manager-for-noncritical-work': 'warn',
-      'expo-performance/no-index-key-in-lists': 'error',
+      'expo-performance/no-index-key-in-lists': 'warn',
     },
   },
 ];
@@ -77,23 +77,25 @@ Enable the plugin in legacy eslintrc configurations:
 
 This plugin includes the following rules to flag commonly generated Expo and React Native mistakes:
 
+The recommended preset is intentionally advisory. Cleanup, animation, and location rules run across the project as warnings. Render, list, navigation, context, and image rules are scoped to common React component, route, screen, app, and hook paths so service modules do not inherit React-specific heuristics by default. Tighten selected rules to `error` once the warnings are clean in your project.
+
 | Rule | Category | Severity | Description |
 | :--- | :--- | :--- | :--- |
-| [`no-uncleaned-native-subscriptions`](#no-uncleaned-native-subscriptions) | Battery / Memory | `error` | Ensures hardware sensor subscriptions (Accelerometer, Gyroscope, etc.) are cleaned up inside hooks. |
-| [`no-uncleaned-timers`](#no-uncleaned-timers) | Battery / CPU | `error` | Ensures `setInterval` and `setTimeout` are cleared. |
+| [`no-uncleaned-native-subscriptions`](#no-uncleaned-native-subscriptions) | Battery / Memory | `warn` | Ensures hardware sensor subscriptions (Accelerometer, Gyroscope, etc.) are cleaned up inside hooks. |
+| [`no-uncleaned-timers`](#no-uncleaned-timers) | Battery / CPU | `warn` | Ensures `setInterval` and `setTimeout` are cleared. |
 | [`no-high-accuracy-location`](#no-high-accuracy-location) | Battery | `warn` | Flags energy-intensive accuracy levels (Highest/BestForNavigation) in Expo Location. |
 | [`no-unmemoized-array-operations`](#no-unmemoized-array-operations) | CPU | `warn` | Flags unmemoized heavy array transformations (`filter`/`sort`/`reduce`) inside component renders. |
-| [`no-inline-navigation-components`](#no-inline-navigation-components) | CPU / Render | `error` | Prevents screen unmount/remount loops caused by inline functions in screen component definitions. |
-| [`use-window-dimensions`](#use-window-dimensions) | Layout | `error` | Enforces `useWindowDimensions` hook instead of static module-level `Dimensions.get` queries. |
+| [`no-inline-navigation-components`](#no-inline-navigation-components) | CPU / Render | `warn` | Prevents screen unmount/remount loops caused by inline functions in screen component definitions. |
+| [`use-window-dimensions`](#use-window-dimensions) | Layout | `warn` | Enforces `useWindowDimensions` hook instead of static module-level `Dimensions.get` queries. |
 | [`use-expo-image`](#use-expo-image) | CPU / Memory | `warn` | Enforces using `expo-image` instead of `react-native` Image for optimized caching and memory. |
 | [`use-native-driver`](#use-native-driver) | CPU / FPS | `warn` | Enforces `useNativeDriver: true` for React Native Animated transitions. |
 | [`prefer-flash-list-for-large-lists`](#prefer-flash-list-for-large-lists) | Memory / Scroll | `warn` | Suggests FlashList for dynamic FlatList/SectionList datasets. |
 | [`no-inline-list-render-props`](#no-inline-list-render-props) | Render | `warn` | Prevents unstable inline render callbacks and object props on list components. |
-| [`require-location-watch-cleanup`](#require-location-watch-cleanup) | Battery / Location | `error` | Ensures async Expo Location watchers are captured and removed. |
+| [`require-location-watch-cleanup`](#require-location-watch-cleanup) | Battery / Location | `warn` | Ensures async Expo Location watchers are captured and removed. |
 | [`no-anonymous-context-values`](#no-anonymous-context-values) | Render | `warn` | Prevents new context provider values from being allocated on every render. |
 | [`no-heavy-work-in-render`](#no-heavy-work-in-render) | CPU | `warn` | Flags obvious expensive work in component render bodies. |
 | [`prefer-interaction-manager-for-noncritical-work`](#prefer-interaction-manager-for-noncritical-work) | Navigation / FPS | `warn` | Defers expensive focus work until after navigation interactions. |
-| [`no-index-key-in-lists`](#no-index-key-in-lists) | Correctness / Render | `error` | Prevents array indexes from being used as list keys. |
+| [`no-index-key-in-lists`](#no-index-key-in-lists) | Correctness / Render | `warn` | Prevents array indexes from being used as list keys. |
 
 ---
 
